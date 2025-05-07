@@ -11,22 +11,11 @@ npm install
 
 2. Configure your environment variables by creating a `.env` file:
 ```
-EMAIL_USER=your_zoho_email@zohomail.com
-EMAIL_PASSWORD=your_zoho_app_password
-EMAIL_HOST=smtp.zoho.com
+EMAIL_USER=
+EMAIL_PASSWORD=
+EMAIL_HOST=
 EMAIL_PORT=587
 OPENAI_API_KEY=your_openai_api_key
-```
-
-Note: For Zoho Mail, you'll need to generate an app-specific password rather than using your actual account password.
-
-## Creating a Recipients List
-
-Create a text file with one email address per line, for example:
-```
-recipient1@example.com
-recipient2@example.com
-recipient3@example.com
 ```
 
 ## Usage
