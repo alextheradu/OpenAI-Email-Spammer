@@ -22,7 +22,7 @@ const transporter = nodemailer.createTransport({
 async function generateEmailContent(prompt) {
   try {
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4.1-nano',
+      model: process.env.OPENAI_MODEL,
       messages: [
         { role: 'system', content: 'You are an email content assistant. Generate professional sounding email content.' },
         { role: 'user', content: prompt }
