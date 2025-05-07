@@ -22,7 +22,11 @@ OPENAI_API_KEY=your_openai_api_key
 
 Run the application with:
 ```
-node index.js
+npm start
+```
+or
+```
+node script.js
 ```
 
 Follow the interactive prompts to:

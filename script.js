@@ -145,8 +145,8 @@ async function main() {
         name: 'emailCount',
         message: 'How many emails do you want to send to each recipient?',
         default: '1',
-        validate: input => (parseInt(input.trim()) > 0 ? true : 'Enter a number greater than 0'),
-        filter: input => parseInt(input.trim())
+        validate: input => (parseInt(String(input).trim()) > 0 ? true : 'Enter a number greater than 0'),
+        filter: input => parseInt(String(input).trim())
       }
     ]);
     const emailCount = countAnswer.emailCount;
