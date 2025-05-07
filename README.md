@@ -21,6 +21,7 @@ WEB_PORT=3000
 ```
 
 ## Usage
+You can choose to use either the CLI-Only, WebUI, or both (not in parallel).
 
 ### CLI-Only
 Run the application with:
