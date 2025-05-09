@@ -8,16 +8,49 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
+// SMTP configuration for different providers
+const smtpConfigs = {
+  zoho: {
+    host: process.env.EMAIL_HOST || 'smtp.zoho.com',
+    port: process.env.EMAIL_PORT || 587,
+    secure: process.env.EMAIL_SECURE === 'true',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
+    },
+    tls: { rejectUnauthorized: false }
   },
-  tls: { rejectUnauthorized: false }
-});
+  gmail: {
+    host: process.env.GMAIL_HOST || 'smtp.gmail.com',
+    port: process.env.GMAIL_PORT || 587,
+    secure: process.env.GMAIL_SECURE === 'true',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_PASSWORD,
+    },
+    tls: { rejectUnauthorized: false }
+  },
+  custom: {
+    host: process.env.EMAIL_HOST,
+    port: process.env.EMAIL_PORT,
+    secure: process.env.EMAIL_SECURE === 'true',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
+    },
+    tls: { rejectUnauthorized: false }
+  }
+};
+
+// Create transporter based on selected config
+function createTransporter(smtpProvider) {
+  const config = smtpConfigs[smtpProvider];
+  if (!config) throw new Error(`Invalid SMTP provider: ${smtpProvider}`);
+  return nodemailer.createTransport(config);
+}
+
+// Initialize with default provider
+let transporter = null;
 
 async function generateEmailContent(prompt) {
   try {
@@ -36,12 +69,20 @@ async function generateEmailContent(prompt) {
   }
 }
 
-async function sendEmails(recipients, subject, message) {
+async function sendEmails(recipients, subject, message, smtpProvider) {
+  // Make sure we have a valid transporter
+  if (!transporter || transporter._smtpProvider !== smtpProvider) {
+    transporter = createTransporter(smtpProvider);
+    transporter._smtpProvider = smtpProvider; // Tag the transporter with its provider
+  }
+  
   const results = [];
+  const fromEmail = smtpProvider === 'gmail' ? process.env.GMAIL_USER : process.env.EMAIL_USER;
+  
   for (const recipient of recipients) {
     try {
       const info = await transporter.sendMail({
-        from: process.env.EMAIL_USER,
+        from: fromEmail,
         to: recipient,
         subject,
         html: message,
@@ -57,7 +98,7 @@ async function sendEmails(recipients, subject, message) {
   return results;
 }
 
-async function sendMultipleEmails(recipients, emailCount, uniquePerEmail, contentPrompt) {
+async function sendMultipleEmails(recipients, emailCount, uniquePerEmail, contentPrompt, smtpProvider) {
   console.log(`Starting to send ${emailCount} emails to each of ${recipients.length} recipients...`);
   for (const recipient of recipients) {
     console.log(`Processing recipient: ${recipient}`);
@@ -68,7 +109,7 @@ async function sendMultipleEmails(recipients, emailCount, uniquePerEmail, conten
         const message = await generateEmailContent(`Generate an HTML email body for: ${contentPrompt}. This is email ${i+1} for ${recipient}. Subject: ${subject}`);
         console.log(`Sending email ${i+1}/${emailCount} to ${recipient}`);
         console.log(`Subject: ${subject}`);
-        await sendEmails([recipient], subject, message);
+        await sendEmails([recipient], subject, message, smtpProvider);
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
     } else {
@@ -78,7 +119,7 @@ async function sendMultipleEmails(recipients, emailCount, uniquePerEmail, conten
       console.log(`Subject: ${subject}`);
       for (let i = 0; i < emailCount; i++) {
         console.log(`Sending identical email ${i+1}/${emailCount} to ${recipient}`);
-        await sendEmails([recipient], subject, message);
+        await sendEmails([recipient], subject, message, smtpProvider);
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
@@ -88,6 +129,37 @@ async function sendMultipleEmails(recipients, emailCount, uniquePerEmail, conten
 
 async function main() {
   try {
+    // Let user choose SMTP provider
+    const defaultSmtp = process.env.DEFAULT_SMTP || 'zoho';
+    const smtpAnswer = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'smtpProvider',
+        message: 'Select email server to use:',
+        choices: [
+          { name: 'Zoho Mail', value: 'zoho' },
+          { name: 'Gmail (requires App Password for 2FA)', value: 'gmail' },
+          { name: 'Custom SMTP', value: 'custom' }
+        ],
+        default: defaultSmtp
+      }
+    ]);
+    
+    const smtpProvider = smtpAnswer.smtpProvider;
+    console.log(`Using ${smtpProvider} as email provider`);
+    
+    // Check if the selected provider has credentials configured
+    if (smtpProvider === 'gmail' && (!process.env.GMAIL_USER || !process.env.GMAIL_PASSWORD)) {
+      console.error('Gmail credentials not configured. Please update your .env file with GMAIL_USER and GMAIL_PASSWORD.');
+      return;
+    } else if (smtpProvider === 'zoho' && (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD)) {
+      console.error('Zoho credentials not configured. Please update your .env file with EMAIL_USER and EMAIL_PASSWORD.');
+      return;
+    } else if (smtpProvider === 'custom' && (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD)) {
+      console.error('Custom SMTP credentials not configured. Please update your .env file with EMAIL_HOST, EMAIL_USER and EMAIL_PASSWORD.');
+      return;
+    }
+    
     const recipientMethodAnswer = await inquirer.prompt([
       {
         type: 'list',
@@ -179,11 +251,11 @@ async function main() {
       if (emailCount > 1) {
         for (let i = 0; i < emailCount; i++) {
           console.log(`Sending batch ${i+1}/${emailCount}`);
-          await sendEmails(recipients, subject, message);
+          await sendEmails(recipients, subject, message, smtpProvider);
           if (i < emailCount - 1) await new Promise(resolve => setTimeout(resolve, 2000));
         }
       } else {
-        await sendEmails(recipients, subject, message);
+        await sendEmails(recipients, subject, message, smtpProvider);
       }
     } else {
       let uniquePerRecipient, uniquePerEmail;
@@ -218,7 +290,7 @@ async function main() {
       const contentPrompt = promptAnswer.contentPrompt;
       if (emailCount > 1) {
         if (uniquePerRecipient) {
-          await sendMultipleEmails(recipients, emailCount, uniquePerEmail, contentPrompt);
+          await sendMultipleEmails(recipients, emailCount, uniquePerEmail, contentPrompt, smtpProvider);
         } else {
           if (uniquePerEmail) {
             for (let i = 0; i < emailCount; i++) {
@@ -227,7 +299,7 @@ async function main() {
               message = await generateEmailContent(`Generate an HTML email body for: ${contentPrompt}. This is email batch ${i+1}. Subject: ${subject}`);
               console.log(`Sending batch ${i+1}/${emailCount} to all recipients`);
               console.log(`Subject: ${subject}`);
-              await sendEmails(recipients, subject, message);
+              await sendEmails(recipients, subject, message, smtpProvider);
               if (i < emailCount - 1) await new Promise(resolve => setTimeout(resolve, 2000));
             }
           } else {
@@ -238,7 +310,7 @@ async function main() {
             console.log(`Subject: ${subject}`);
             for (let i = 0; i < emailCount; i++) {
               console.log(`Sending identical batch ${i+1}/${emailCount} to all recipients`);
-              await sendEmails(recipients, subject, message);
+              await sendEmails(recipients, subject, message, smtpProvider);
               if (i < emailCount - 1) await new Promise(resolve => setTimeout(resolve, 2000));
             }
           }
@@ -251,7 +323,7 @@ async function main() {
             message = await generateEmailContent(`Generate an HTML email body for: ${contentPrompt}. This is for ${recipient}. Subject: ${subject}`);
             console.log(`Sending unique message to ${recipient}`);
             console.log(`Subject: ${subject}`);
-            await sendEmails([recipient], subject, message);
+            await sendEmails([recipient], subject, message, smtpProvider);
           }
         } else {
           console.log('Generating AI content for all recipients...');
@@ -259,7 +331,7 @@ async function main() {
           message = await generateEmailContent(`Generate an HTML email body for: ${contentPrompt}. Subject: ${subject}`);
           console.log('Content generated successfully!');
           console.log(`Subject: ${subject}`);
-          await sendEmails(recipients, subject, message);
+          await sendEmails(recipients, subject, message, smtpProvider);
         }
       }
     }
