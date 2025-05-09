@@ -11,7 +11,7 @@ npm install
 
 2. Configure your environment variables by creating a `.env` file:
 ```
-# Zoho or custom SMTP configuration
+# Custom SMTP configuration
 EMAIL_USER=your_email@domain.com
 EMAIL_PASSWORD=your_password
 EMAIL_HOST=smtp.your-provider.com
@@ -25,8 +25,8 @@ GMAIL_HOST=smtp.gmail.com
 GMAIL_PORT=587
 GMAIL_SECURE=false
 
-# Default SMTP provider (zoho, gmail, custom)
-DEFAULT_SMTP=zoho
+# Default SMTP provider (gmail, custom)
+DEFAULT_SMTP=
 
 OPENAI_API_KEY=your_openai_api_key
 OPENAI_MODEL=gpt-4.1-nano
@@ -56,14 +56,14 @@ node script.js
 ```
 
 Follow the interactive prompts to:
-1. Select your SMTP provider (Zoho, Gmail, or Custom)
+1. Select your SMTP provider (Gmail or Custom)
 2. Specify your recipients
 3. Choose between manual content entry or AI-generated content
 4. If using AI generation, decide whether to send the same message to all recipients or create unique messages for each
 
 ## Features
 
-- **Multiple SMTP Providers**: Support for Zoho, Gmail, or custom SMTP servers
+- **Multiple SMTP Providers**: Support for Gmail or custom SMTP servers
 - **Manual Mode**: Enter your own subject and HTML message content
 - **AI Generation**: Use OpenAI's GPT-4.1 Nano to generate email content
   - **Same Message Option**: Generate one subject/message for all recipients
